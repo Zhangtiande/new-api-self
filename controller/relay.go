@@ -153,6 +153,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	relayInfo.SetEstimatePromptTokens(tokens)
 
+	// 用户级/令牌级最大上下文限制：在预扣费前拦截超限的大输入请求。
+	// 估算口径与预扣费一致（含历史消息、system、图片）；依赖 token 统计开启。
+	if limit := relayInfo.GetMaxContextTokens(); limit > 0 && tokens > limit {
+		newAPIError = types.NewErrorWithStatusCode(
+			fmt.Errorf("request input tokens (%d) exceed the max context length (%d) allowed for this key/user", tokens, limit),
+			types.ErrorCodeContextLengthExceeded, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		return
+	}
+
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))

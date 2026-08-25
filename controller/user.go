@@ -663,12 +663,20 @@ func GetUserModels(c *gin.Context) {
 }
 
 func UpdateUser(c *gin.Context) {
-	var updatedUser model.User
-	err := common.DecodeJson(c.Request.Body, &updatedUser)
-	if err != nil || updatedUser.Id == 0 {
+	var req struct {
+		model.User
+		MaxContextTokens *int `json:"max_context_tokens"`
+	}
+	err := common.DecodeJson(c.Request.Body, &req)
+	if err != nil || req.User.Id == 0 {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	if req.MaxContextTokens != nil && *req.MaxContextTokens < 0 {
+		common.ApiErrorMsg(c, "max_context_tokens 不能为负数")
+		return
+	}
+	updatedUser := req.User
 	updatedUser.Username = strings.TrimSpace(updatedUser.Username)
 	if updatedUser.Username == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
@@ -714,6 +722,14 @@ func UpdateUser(c *gin.Context) {
 	}
 	if authzTouched {
 		if err := authz.ReloadPolicy(); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
+	if req.MaxContextTokens != nil {
+		setting := originUser.GetSetting()
+		setting.MaxContextTokens = *req.MaxContextTokens
+		if err := model.UpdateUserSetting(updatedUser.Id, setting); err != nil {
 			common.ApiError(c, err)
 			return
 		}
@@ -1500,6 +1516,8 @@ func UpdateUserSetting(c *gin.Context) {
 		UpstreamModelUpdateNotifyEnabled: upstreamModelUpdateNotifyEnabled,
 		AcceptUnsetRatioModel:            req.AcceptUnsetModelRatioModel,
 		RecordIpLog:                      req.RecordIpLog,
+		// 管理员专属字段，用户自助保存时原样保留
+		MaxContextTokens: existingSettings.MaxContextTokens,
 	}
 
 	// 如果是webhook类型,添加webhook相关设置

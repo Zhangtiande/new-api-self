@@ -89,7 +89,7 @@ import {
   transformFormDataToPayload,
   transformUserToFormDefaults,
 } from '../lib'
-import { type User } from '../types'
+import type { User } from '../types'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -136,16 +136,20 @@ export function UsersMutateDrawer({
   useEffect(() => {
     if (open && isUpdate && currentRow) {
       // For update, fetch fresh data
-      getUser(currentRow.id).then((result) => {
-        if (result.success && result.data) {
-          form.reset(transformUserToFormDefaults(result.data))
-        }
-      })
+      getUser(currentRow.id)
+        .then((result) => {
+          if (result.success && result.data) {
+            form.reset(transformUserToFormDefaults(result.data))
+          }
+        })
+        .catch(() => {
+          toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+        })
     } else if (open && !isUpdate) {
       // For create, reset to defaults
       form.reset(USER_FORM_DEFAULT_VALUES)
     }
-  }, [open, isUpdate, currentRow, form])
+  }, [open, isUpdate, currentRow, form, t])
 
   const { meta: currencyMeta } = getCurrencyDisplay()
   const currencyLabel = getCurrencyLabel()
@@ -195,7 +199,7 @@ export function UsersMutateDrawer({
               : t(ERROR_MESSAGES.CREATE_FAILED))
         )
       }
-    } catch (_error) {
+    } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setIsSubmitting(false)
@@ -360,12 +364,10 @@ export function UsersMutateDrawer({
                       <FormItem>
                         <FormLabel>{t('Group')}</FormLabel>
                         <Select
-                          items={[
-                            ...groups.map((group) => ({
-                              value: group,
-                              label: group,
-                            })),
-                          ]}
+                          items={groups.map((group) => ({
+                            value: group,
+                            label: group,
+                          }))}
                           onValueChange={field.onChange}
                           value={field.value}
                         >
@@ -422,6 +424,37 @@ export function UsersMutateDrawer({
                         </div>
                         <FormDescription>
                           {formatQuota(parseQuotaFromDollars(field.value || 0))}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='max_context_tokens'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Max Context (tokens)')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min='0'
+                            step='1'
+                            placeholder={t('0 means no limit')}
+                            value={field.value ?? 0}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseInt(e.target.value, 10) || 0
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Maximum input tokens per request for this user, including history messages (0 = no limit). The smaller of the user and key limits applies.'
+                          )}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

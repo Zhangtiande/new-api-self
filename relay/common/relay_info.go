@@ -81,16 +81,17 @@ type TokenCountMeta struct {
 }
 
 type RelayInfo struct {
-	TokenId           int
-	TokenKey          string
-	TokenGroup        string
-	UserId            int
-	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
-	UserGroup         string // 用户所在分组
-	TokenUnlimited    bool
-	StartTime         time.Time
-	FirstResponseTime time.Time
-	isFirstResponse   bool
+	TokenId               int
+	TokenKey              string
+	TokenGroup            string
+	TokenMaxContextTokens int // 令牌级单请求输入 token 上限，0 表示不限
+	UserId                int
+	UsingGroup            string // 使用的分组，当auto跨分组重试时，会变动
+	UserGroup             string // 用户所在分组
+	TokenUnlimited        bool
+	StartTime             time.Time
+	FirstResponseTime     time.Time
+	isFirstResponse       bool
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -514,10 +515,11 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 
-		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
-		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),
-		TokenUnlimited: common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
-		TokenGroup:     tokenGroup,
+		TokenId:               common.GetContextKeyInt(c, constant.ContextKeyTokenId),
+		TokenKey:              common.GetContextKeyString(c, constant.ContextKeyTokenKey),
+		TokenUnlimited:        common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
+		TokenGroup:            tokenGroup,
+		TokenMaxContextTokens: common.GetContextKeyInt(c, constant.ContextKeyTokenMaxContextTokens),
 
 		isFirstResponse: true,
 		RelayMode:       relayconstant.Path2RelayMode(c.Request.URL.Path),
@@ -723,6 +725,23 @@ func (info *RelayInfo) GetEstimatePromptTokens() int {
 		return 0
 	}
 	return info.estimatePromptTokens
+}
+
+// GetMaxContextTokens 返回本次请求生效的单请求输入 token 上限：
+// 令牌级与用户级中较小的非零值，0 表示不限。
+func (info *RelayInfo) GetMaxContextTokens() int {
+	if info == nil {
+		return 0
+	}
+	limit := info.TokenMaxContextTokens
+	userLimit := info.UserSetting.MaxContextTokens
+	if userLimit > 0 && (limit <= 0 || userLimit < limit) {
+		limit = userLimit
+	}
+	if limit < 0 {
+		return 0
+	}
+	return limit
 }
 
 // ---------------------------------------------------------------------------

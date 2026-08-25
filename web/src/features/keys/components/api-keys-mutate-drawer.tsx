@@ -744,6 +744,37 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name='max_context_tokens'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Max Context (tokens)')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type='number'
+                              min='0'
+                              step='1'
+                              placeholder={t('0 means no limit')}
+                              value={field.value ?? 0}
+                              onChange={(e) =>
+                                field.onChange(
+                                  Number.parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Maximum input tokens per request for this key, including history messages (0 = no limit)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>
