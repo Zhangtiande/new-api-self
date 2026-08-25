@@ -294,6 +294,12 @@ func SetApiRouter(router *gin.Engine) {
 			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
 		}
 
+		analyticsRoute := apiRouter.Group("/analytics")
+		analyticsRoute.Use(middleware.AdminAuth())
+		{
+			analyticsRoute.GET("/monthly-report", controller.GetMonthlyAnalyticsReport)
+		}
+
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)
