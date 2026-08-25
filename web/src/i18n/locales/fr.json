@@ -5316,6 +5316,11 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Thinking Suffix (Self-hosted)": "Suffixe Thinking (auto-hébergé)",
+    "Enable Thinking Suffix Rules": "Activer les règles de suffixe Thinking",
+    "For OpenAI-compatible self-hosted channels (sglang/vLLM): requests to `model-thinking` strip the suffix upstream and merge the on template; bare model names merge the off template. Channel param override still takes precedence.": "Pour les canaux auto-hébergés compatibles OpenAI (sglang/vLLM) : les requêtes vers `modèle-thinking` retirent le suffixe en amont et fusionnent le modèle « on » ; les noms nus fusionnent le modèle « off ». La surcharge de paramètres du canal reste prioritaire.",
+    "Thinking Suffix Rules": "Règles de suffixe Thinking",
+    "JSON array of rules matched by longest model-name prefix (after stripping the -thinking suffix). `on`/`off` are JSON merge patches applied to the upstream request body.": "Tableau JSON de règles appariées par le plus long préfixe de nom de modèle (après retrait du suffixe -thinking). `on`/`off` sont des correctifs JSON fusionnés dans la requête amont."
   }
 }

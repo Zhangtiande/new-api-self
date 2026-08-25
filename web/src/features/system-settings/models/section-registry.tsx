@@ -25,6 +25,7 @@ import { GeminiSettingsCard } from './gemini-settings-card'
 import { GlobalSettingsCard } from './global-settings-card'
 import { GrokSettingsCard } from './grok-settings-card'
 import { RoutingReliabilitySection } from './routing-reliability-section'
+import { ThinkingSuffixSettingsCard } from './thinking-suffix-settings-card'
 
 function formatJsonForEditor(value: string, fallback: string) {
   const raw = (value ?? '').toString().trim()
@@ -143,6 +144,20 @@ const MODELS_SECTIONS = [
             settings['grok.violation_deduction_enabled'] ?? true,
           'grok.violation_deduction_amount':
             settings['grok.violation_deduction_amount'] ?? 0.05,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'thinking-suffix',
+    titleKey: 'Thinking Suffix (Self-hosted)',
+    build: (settings: ModelSettings) => (
+      <ThinkingSuffixSettingsCard
+        defaultValues={{
+          thinking_suffix: {
+            enabled: settings['thinking_suffix.enabled'],
+            rules: formatJsonForEditor(settings['thinking_suffix.rules'], '[]'),
+          },
         }}
       />
     ),

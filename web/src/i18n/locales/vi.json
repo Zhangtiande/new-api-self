@@ -5316,6 +5316,11 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Thinking Suffix (Self-hosted)": "Hậu tố Thinking (tự triển khai)",
+    "Enable Thinking Suffix Rules": "Bật quy tắc hậu tố Thinking",
+    "For OpenAI-compatible self-hosted channels (sglang/vLLM): requests to `model-thinking` strip the suffix upstream and merge the on template; bare model names merge the off template. Channel param override still takes precedence.": "Cho các kênh tự triển khai tương thích OpenAI (sglang/vLLM): yêu cầu tới `model-thinking` sẽ bỏ hậu tố khi gửi lên upstream và gộp mẫu on; tên mô hình không hậu tố gộp mẫu off. Ghi đè tham số của kênh vẫn được ưu tiên.",
+    "Thinking Suffix Rules": "Quy tắc hậu tố Thinking",
+    "JSON array of rules matched by longest model-name prefix (after stripping the -thinking suffix). `on`/`off` are JSON merge patches applied to the upstream request body.": "Mảng JSON các quy tắc khớp theo tiền tố tên mô hình dài nhất (sau khi bỏ hậu tố -thinking). `on`/`off` là các bản vá JSON gộp vào thân yêu cầu upstream."
   }
 }

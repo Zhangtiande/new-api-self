@@ -5316,6 +5316,11 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Thinking Suffix (Self-hosted)": "思考后缀（自部署）",
+    "Enable Thinking Suffix Rules": "启用思考后缀规则",
+    "For OpenAI-compatible self-hosted channels (sglang/vLLM): requests to `model-thinking` strip the suffix upstream and merge the on template; bare model names merge the off template. Channel param override still takes precedence.": "面向 OpenAI 兼容的自部署渠道（sglang/vLLM）：请求 `模型名-thinking` 时剥掉后缀发往上游并合并 on 模板；裸模型名合并 off 模板。渠道参数覆盖仍然优先于全局规则。",
+    "Thinking Suffix Rules": "思考后缀规则",
+    "JSON array of rules matched by longest model-name prefix (after stripping the -thinking suffix). `on`/`off` are JSON merge patches applied to the upstream request body.": "规则为 JSON 数组，按模型名最长前缀匹配（先剥掉 -thinking 后缀再匹配）。`on`/`off` 是合并进上游请求体的 JSON 补丁。"
   }
 }

@@ -165,6 +165,12 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 
+		// 全局思考后缀适配（sglang/vLLM enable_thinking 等），渠道参数覆盖仍可覆盖其结果
+		jsonData, err = relaycommon.ApplyThinkingSuffixTemplate(jsonData, info)
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+		}
+
 		// apply param override
 		if len(info.ParamOverride) > 0 {
 			jsonData, err = relaycommon.ApplyParamOverrideWithRelayInfo(jsonData, info)

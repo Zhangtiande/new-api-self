@@ -5316,6 +5316,11 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Thinking Suffix (Self-hosted)": "Thinking サフィックス（セルフホスト）",
+    "Enable Thinking Suffix Rules": "Thinking サフィックスルールを有効化",
+    "For OpenAI-compatible self-hosted channels (sglang/vLLM): requests to `model-thinking` strip the suffix upstream and merge the on template; bare model names merge the off template. Channel param override still takes precedence.": "OpenAI 互換のセルフホストチャネル（sglang/vLLM）向け：`モデル名-thinking` へのリクエストはサフィックスを外して上流に送り、on テンプレートをマージします。サフィックスなしは off テンプレートをマージします。チャネルのパラメータ上書きが引き続き優先されます。",
+    "Thinking Suffix Rules": "Thinking サフィックスルール",
+    "JSON array of rules matched by longest model-name prefix (after stripping the -thinking suffix). `on`/`off` are JSON merge patches applied to the upstream request body.": "モデル名の最長前方一致（-thinking サフィックスを外した後）でマッチするルールの JSON 配列。`on`/`off` は上流リクエストボディにマージされる JSON パッチです。"
   }
 }
