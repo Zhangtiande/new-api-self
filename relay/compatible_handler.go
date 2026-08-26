@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/samber/lo"
 
@@ -33,6 +34,14 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	request, err := common.DeepCopy(textReq)
 	if err != nil {
 		return types.NewError(fmt.Errorf("failed to copy request to GeneralOpenAIRequest: %w", err), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	// 内容洞察：提取第一条 user 消息，消费日志落库时写入问题表
+	if operation_setting.GetContentInsightSettings().Enabled {
+		if question, hash := relaycommon.ExtractChatQuestion(textReq.Messages); hash != "" {
+			common.SetContextKey(c, constant.ContextKeyChatQuestion, question)
+			common.SetContextKey(c, constant.ContextKeyChatQuestionHash, hash)
+		}
 	}
 
 	if request.WebSearchOptions != nil {

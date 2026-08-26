@@ -44,6 +44,8 @@ const defaultSecuritySettings: SecuritySettings = {
   'token_setting.max_user_tokens': 1000,
   'compute_policy.enabled': false,
   'compute_policy.windows': '[]',
+  'content_insight.enabled': false,
+  'content_insight.retention_days': 90,
 }
 
 export function SecuritySettings() {

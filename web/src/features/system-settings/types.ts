@@ -390,6 +390,8 @@ export type SecuritySettings = {
   'token_setting.max_user_tokens': number
   'compute_policy.enabled': boolean
   'compute_policy.windows': string
+  'content_insight.enabled': boolean
+  'content_insight.retention_days': number
 }
 
 export type UpstreamChannel = {

@@ -21,6 +21,8 @@ const (
 	ContextKeyTokenCrossGroupRetry   ContextKey = "token_cross_group_retry"
 	ContextKeyTokenAutoGroups        ContextKey = "token_auto_groups"
 	ContextKeyTokenMaxContextTokens  ContextKey = "token_max_context_tokens"
+	ContextKeyChatQuestion           ContextKey = "chat_question"
+	ContextKeyChatQuestionHash       ContextKey = "chat_question_hash"
 
 	/* channel related keys */
 	ContextKeyChannelId                ContextKey = "channel_id"

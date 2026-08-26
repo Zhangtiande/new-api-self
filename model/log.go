@@ -387,6 +387,8 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	if err != nil {
 		logger.LogError(c, "failed to record log: "+err.Error())
 	}
+	// 内容洞察：随消费日志落问题表（功能关闭或未提取到问题时为空操作）
+	recordChatQuestion(c, userId, params, username, requestId, createdAt)
 	if common.DataExportEnabled {
 		LogQuotaData(QuotaDataLogParams{
 			UserID:    userId,

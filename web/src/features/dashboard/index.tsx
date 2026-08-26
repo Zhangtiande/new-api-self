@@ -119,6 +119,12 @@ const LazyMonthlyReport = lazy(() =>
   }))
 )
 
+const LazyContentInsight = lazy(() =>
+  import('@/features/content-insight/insight-section').then((m) => ({
+    default: m.ContentInsightSection,
+  }))
+)
+
 function LogStatCardsFallback() {
   return (
     <div className='overflow-hidden rounded-lg border'>
@@ -198,6 +204,9 @@ const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
   report: {
     titleKey: 'Monthly Report',
   },
+  insight: {
+    titleKey: 'Content Insight',
+  },
 }
 
 export function Dashboard() {
@@ -259,7 +268,8 @@ export function Dashboard() {
       DASHBOARD_SECTION_IDS.filter(
         (section) =>
           section !== 'overview' &&
-          ((section !== 'users' && section !== 'report') || isAdmin)
+          ((section !== 'users' && section !== 'report' && section !== 'insight') ||
+            isAdmin)
       ),
     [isAdmin]
   )
@@ -425,6 +435,13 @@ export function Dashboard() {
             <FadeIn>
               <Suspense fallback={<ModelChartsFallback />}>
                 <LazyMonthlyReport />
+              </Suspense>
+            </FadeIn>
+          )}
+          {activeSection === 'insight' && isAdmin && (
+            <FadeIn>
+              <Suspense fallback={<ModelChartsFallback />}>
+                <LazyContentInsight />
               </Suspense>
             </FadeIn>
           )}

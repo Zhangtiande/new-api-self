@@ -114,6 +114,9 @@ func main() {
 	// 数据看板
 	go model.UpdateQuotaData()
 
+	// 内容洞察：词频聚合与保留期清理（功能关闭时空转）
+	go service.StartContentInsightWorker()
+
 	if os.Getenv("CHANNEL_UPDATE_FREQUENCY") != "" {
 		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_UPDATE_FREQUENCY"))
 		if err != nil {

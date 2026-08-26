@@ -298,6 +298,8 @@ func SetApiRouter(router *gin.Engine) {
 		analyticsRoute.Use(middleware.AdminAuth())
 		{
 			analyticsRoute.GET("/monthly-report", controller.GetMonthlyAnalyticsReport)
+			analyticsRoute.GET("/content-terms", controller.GetContentInsightTerms)
+			analyticsRoute.GET("/content-questions", controller.GetContentInsightQuestions)
 		}
 
 		dataRoute := apiRouter.Group("/data")

@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ComputePolicySection } from '../request-limits/compute-policy-section'
+import { ContentInsightSettingsSection } from '../request-limits/content-insight-section'
 import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
@@ -65,6 +66,19 @@ const SECURITY_SECTIONS = [
           CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
           CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
           SensitiveWords: settings.SensitiveWords,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'content-insight',
+    titleKey: 'Content Insight',
+    build: (settings: SecuritySettings) => (
+      <ContentInsightSettingsSection
+        defaultValues={{
+          'content_insight.enabled': settings['content_insight.enabled'],
+          'content_insight.retention_days':
+            settings['content_insight.retention_days'],
         }}
       />
     ),
