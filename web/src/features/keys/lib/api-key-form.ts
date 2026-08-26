@@ -43,7 +43,7 @@ export function getApiKeyFormSchema(t: TFunction, maxAutoGroups = 5) {
       max_context_tokens: z
         .number()
         .int()
-        .min(0, t('Max context must be zero or greater'))
+        .min(-1, t('Max context must be -1, 0, or a positive integer'))
         .optional(),
       group: z.string().optional(),
       auto_groups_mode: z.enum(['inherit', 'custom']),

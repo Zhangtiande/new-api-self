@@ -291,6 +291,9 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		tieredResult = tieredRes
 	}
 
+	// TPM 限速记账：按真实用量回写用户分钟桶（入口 CheckTPMLimit 读取）。
+	RecordTPMUsage(ctx, relayInfo.UserId, usage.PromptTokens+usage.CompletionTokens)
+
 	useTimeSeconds := time.Now().Unix() - relayInfo.StartTime.Unix()
 	textInputTokens := usage.PromptTokensDetails.TextTokens
 	textOutTokens := usage.CompletionTokenDetails.TextTokens

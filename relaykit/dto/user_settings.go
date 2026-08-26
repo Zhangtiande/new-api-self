@@ -16,7 +16,8 @@ type UserSetting struct {
 	SidebarModules                   string  `json:"sidebar_modules,omitempty"`                      // SidebarModules 左侧边栏模块配置
 	BillingPreference                string  `json:"billing_preference,omitempty"`                   // BillingPreference 扣费策略（订阅/钱包）
 	Language                         string  `json:"language,omitempty"`                             // Language 用户语言偏好 (zh, en)
-	MaxContextTokens                 int     `json:"max_context_tokens,omitempty"`                   // MaxContextTokens 单请求输入 token 上限，0 表示不限；仅管理员可写
+	MaxContextTokens                 int     `json:"max_context_tokens,omitempty"`                   // MaxContextTokens 单请求输入 token 上限，0 跟随算力策略，-1 显式豁免；仅管理员可写
+	TPMLimit                         int     `json:"tpm_limit,omitempty"`                            // TPMLimit 每分钟 token 上限，0 跟随算力策略，-1 显式豁免；仅管理员可写
 }
 
 var (

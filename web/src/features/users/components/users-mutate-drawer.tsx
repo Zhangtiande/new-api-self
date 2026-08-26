@@ -440,9 +440,9 @@ export function UsersMutateDrawer({
                           <Input
                             {...field}
                             type='number'
-                            min='0'
+                            min='-1'
                             step='1'
-                            placeholder={t('0 means no limit')}
+                            placeholder={t('0 = follow policy, -1 = exempt')}
                             value={field.value ?? 0}
                             onChange={(e) =>
                               field.onChange(
@@ -453,7 +453,38 @@ export function UsersMutateDrawer({
                         </FormControl>
                         <FormDescription>
                           {t(
-                            'Maximum input tokens per request for this user, including history messages (0 = no limit). The smaller of the user and key limits applies.'
+                            'Maximum input tokens per request for this user, including history messages. 0 = follow the compute policy defaults (no limit when the policy is off), -1 = exempt. The smaller of the user and key limits applies.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name='tpm_limit'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('TPM Limit (tokens/min)')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min='-1'
+                            step='1'
+                            placeholder={t('0 = follow policy, -1 = exempt')}
+                            value={field.value ?? 0}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseInt(e.target.value, 10) || 0
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Maximum tokens per minute for this user (prompt + completion combined). 0 = follow the compute policy defaults, -1 = exempt.'
                           )}
                         </FormDescription>
                         <FormMessage />

@@ -65,6 +65,7 @@ const (
 	ErrorCodeConvertRequestFailed  ErrorCode = "convert_request_failed"
 	ErrorCodeAccessDenied          ErrorCode = "access_denied"
 	ErrorCodeContextLengthExceeded ErrorCode = "context_length_exceeded"
+	ErrorCodeRateLimitExceeded     ErrorCode = "rate_limit_exceeded"
 
 	// request error
 	ErrorCodeBadRequestBody ErrorCode = "bad_request_body"

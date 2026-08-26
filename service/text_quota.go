@@ -407,6 +407,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	adminRejectReason := common.GetContextKeyString(ctx, constant.ContextKeyAdminRejectReason)
 	summary := calculateTextQuotaSummary(ctx, relayInfo, billingUsage)
 
+	// TPM 限速记账：按真实用量回写用户分钟桶（入口 CheckTPMLimit 读取）。
+	RecordTPMUsage(ctx, relayInfo.UserId, summary.PromptTokens+summary.CompletionTokens)
+
 	var tieredResult *billingexpr.TieredResult
 	tieredBillingApplied := false
 	if originUsage != nil {

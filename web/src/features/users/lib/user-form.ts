@@ -41,7 +41,8 @@ export const userFormSchema = z.object({
   quota_dollars: z.number().min(0).optional(),
   group: z.string().optional(),
   remark: z.string().optional(),
-  max_context_tokens: z.number().int().min(0).optional(),
+  max_context_tokens: z.number().int().min(-1).optional(),
+  tpm_limit: z.number().int().min(-1).optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
     .optional(),
@@ -62,6 +63,7 @@ export const USER_FORM_DEFAULT_VALUES: UserFormValues = {
   group: DEFAULT_GROUP,
   remark: '',
   max_context_tokens: 0,
+  tpm_limit: 0,
   // Filled against the backend catalog at render time; see UsersMutateDrawer.
   admin_permissions: {},
 }
@@ -104,6 +106,7 @@ export function transformFormDataToPayload(
     payload.group = data.group
     payload.remark = data.remark || undefined
     payload.max_context_tokens = data.max_context_tokens ?? 0
+    payload.tpm_limit = data.tpm_limit ?? 0
     payload.id = userId
   }
 
@@ -124,21 +127,23 @@ export function transformUserToFormDefaults(user: User): UserFormValues {
     quota_dollars: quotaUnitsToDollars(user.quota),
     group: user.group || DEFAULT_GROUP,
     remark: user.remark || '',
-    max_context_tokens: parseMaxContextTokensFromSetting(user.setting),
+    max_context_tokens: parseLimitFromSetting(user.setting, 'max_context_tokens'),
+    tpm_limit: parseLimitFromSetting(user.setting, 'tpm_limit'),
     admin_permissions: user.admin_permissions ?? {},
   }
 }
 
 /** The backend stores per-user limits inside the `setting` JSON string. */
-function parseMaxContextTokensFromSetting(
-  setting: string | null | undefined
+function parseLimitFromSetting(
+  setting: string | null | undefined,
+  key: 'max_context_tokens' | 'tpm_limit'
 ): number {
   if (!setting) return 0
   try {
-    const parsed = JSON.parse(setting) as { max_context_tokens?: number }
-    const value = parsed?.max_context_tokens
-    return typeof value === 'number' && Number.isFinite(value) && value > 0
-      ? Math.floor(value)
+    const parsed = JSON.parse(setting) as Record<string, unknown>
+    const value = parsed?.[key]
+    return typeof value === 'number' && Number.isFinite(value) && value >= -1
+      ? Math.trunc(value)
       : 0
   } catch {
     return 0

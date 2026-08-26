@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -160,6 +161,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			fmt.Errorf("request input tokens (%d) exceed the max context length (%d) allowed for this key/user", tokens, limit),
 			types.ErrorCodeContextLengthExceeded, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		return
+	}
+
+	// 用户级每分钟 token 限速（TPM）：显式配置或算力策略时段默认。
+	// 判定计入本次估算输入量；真实用量在计费结算处回写分钟桶。
+	if limit := relayInfo.GetTPMLimit(); limit > 0 {
+		if allowed, retryAfter := service.CheckTPMLimit(c, relayInfo.UserId, limit, tokens); !allowed {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			newAPIError = types.NewErrorWithStatusCode(
+				fmt.Errorf("token rate limit reached for this user (limit %d tokens/min), retry after %d seconds", limit, retryAfter),
+				types.ErrorCodeRateLimitExceeded, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
+			return
+		}
 	}
 
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { ComputePolicySection } from '../request-limits/compute-policy-section'
 import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
@@ -37,6 +38,20 @@ const SECURITY_SECTIONS = [
           ModelRequestRateLimitDurationMinutes:
             settings.ModelRequestRateLimitDurationMinutes,
           ModelRequestRateLimitGroup: settings.ModelRequestRateLimitGroup,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'compute-policy',
+    titleKey: 'Compute Policy',
+    build: (settings: SecuritySettings) => (
+      <ComputePolicySection
+        defaultValues={{
+          compute_policy: {
+            enabled: settings['compute_policy.enabled'],
+            windows: settings['compute_policy.windows'] || '[]',
+          },
         }}
       />
     ),

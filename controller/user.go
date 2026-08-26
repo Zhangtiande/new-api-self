@@ -666,14 +666,19 @@ func UpdateUser(c *gin.Context) {
 	var req struct {
 		model.User
 		MaxContextTokens *int `json:"max_context_tokens"`
+		TPMLimit         *int `json:"tpm_limit"`
 	}
 	err := common.DecodeJson(c.Request.Body, &req)
 	if err != nil || req.User.Id == 0 {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if req.MaxContextTokens != nil && *req.MaxContextTokens < 0 {
-		common.ApiErrorMsg(c, "max_context_tokens 不能为负数")
+	if req.MaxContextTokens != nil && *req.MaxContextTokens < -1 {
+		common.ApiErrorMsg(c, "max_context_tokens 仅允许 -1、0 或正数")
+		return
+	}
+	if req.TPMLimit != nil && *req.TPMLimit < -1 {
+		common.ApiErrorMsg(c, "tpm_limit 仅允许 -1、0 或正数")
 		return
 	}
 	updatedUser := req.User
@@ -726,9 +731,14 @@ func UpdateUser(c *gin.Context) {
 			return
 		}
 	}
-	if req.MaxContextTokens != nil {
+	if req.MaxContextTokens != nil || req.TPMLimit != nil {
 		setting := originUser.GetSetting()
-		setting.MaxContextTokens = *req.MaxContextTokens
+		if req.MaxContextTokens != nil {
+			setting.MaxContextTokens = *req.MaxContextTokens
+		}
+		if req.TPMLimit != nil {
+			setting.TPMLimit = *req.TPMLimit
+		}
 		if err := model.UpdateUserSetting(updatedUser.Id, setting); err != nil {
 			common.ApiError(c, err)
 			return
@@ -1518,6 +1528,7 @@ func UpdateUserSetting(c *gin.Context) {
 		RecordIpLog:                      req.RecordIpLog,
 		// 管理员专属字段，用户自助保存时原样保留
 		MaxContextTokens: existingSettings.MaxContextTokens,
+		TPMLimit:         existingSettings.TPMLimit,
 	}
 
 	// 如果是webhook类型,添加webhook相关设置

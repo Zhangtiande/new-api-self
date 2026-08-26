@@ -285,8 +285,8 @@ func AddToken(c *gin.Context) {
 			return
 		}
 	}
-	if token.MaxContextTokens < 0 {
-		common.ApiErrorMsg(c, "max_context_tokens 不能为负数")
+	if token.MaxContextTokens < -1 {
+		common.ApiErrorMsg(c, "max_context_tokens 仅允许 -1、0 或正数")
 		return
 	}
 	// 检查用户令牌数量是否已达上限
@@ -384,8 +384,8 @@ func UpdateToken(c *gin.Context) {
 			return
 		}
 	}
-	if token.MaxContextTokens < 0 {
-		common.ApiErrorMsg(c, "max_context_tokens 不能为负数")
+	if token.MaxContextTokens < -1 {
+		common.ApiErrorMsg(c, "max_context_tokens 仅允许 -1、0 或正数")
 		return
 	}
 	cleanToken, err := model.GetTokenByIds(token.Id, userId)

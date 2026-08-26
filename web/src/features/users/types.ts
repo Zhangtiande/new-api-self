@@ -127,6 +127,7 @@ export interface UserFormData {
   group?: string // Only used when updating user
   remark?: string // Only used when updating user
   max_context_tokens?: number // Only used when updating user
+  tpm_limit?: number // Only used when updating user
   admin_permissions?: AdminPermissionMatrix
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/relayconvert/convmeta"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/model_setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -727,21 +728,47 @@ func (info *RelayInfo) GetEstimatePromptTokens() int {
 	return info.estimatePromptTokens
 }
 
-// GetMaxContextTokens 返回本次请求生效的单请求输入 token 上限：
-// 令牌级与用户级中较小的非零值，0 表示不限。
+// GetMaxContextTokens 返回本次请求生效的单请求输入 token 上限。
+// 令牌/用户任一显式配置（非 0）时全天生效：正值取较小，负值为显式豁免；
+// 双方均为 0 时跟随算力策略当前时段的默认值。最终返回 0 表示不限。
 func (info *RelayInfo) GetMaxContextTokens() int {
 	if info == nil {
 		return 0
 	}
-	limit := info.TokenMaxContextTokens
+	tokenLimit := info.TokenMaxContextTokens
 	userLimit := info.UserSetting.MaxContextTokens
-	if userLimit > 0 && (limit <= 0 || userLimit < limit) {
-		limit = userLimit
+	if tokenLimit != 0 || userLimit != 0 {
+		limit := 0
+		if tokenLimit > 0 {
+			limit = tokenLimit
+		}
+		if userLimit > 0 && (limit == 0 || userLimit < limit) {
+			limit = userLimit
+		}
+		return limit
 	}
-	if limit < 0 {
+	if w := operation_setting.ActiveComputePolicyWindow(); w != nil && w.MaxContextTokens > 0 {
+		return w.MaxContextTokens
+	}
+	return 0
+}
+
+// GetTPMLimit 返回本次请求生效的用户级每分钟 token 上限：
+// 用户显式配置（正值全天生效，负值豁免）优先，0 跟随算力策略当前时段默认。
+func (info *RelayInfo) GetTPMLimit() int {
+	if info == nil {
 		return 0
 	}
-	return limit
+	if v := info.UserSetting.TPMLimit; v != 0 {
+		if v < 0 {
+			return 0
+		}
+		return v
+	}
+	if w := operation_setting.ActiveComputePolicyWindow(); w != nil && w.TPMLimit > 0 {
+		return w.TPMLimit
+	}
+	return 0
 }
 
 // ---------------------------------------------------------------------------

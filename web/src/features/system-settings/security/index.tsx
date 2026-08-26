@@ -42,6 +42,8 @@ const defaultSecuritySettings: SecuritySettings = {
   'fetch_setting.allowed_ports': [],
   'fetch_setting.apply_ip_filter_for_domain': false,
   'token_setting.max_user_tokens': 1000,
+  'compute_policy.enabled': false,
+  'compute_policy.windows': '[]',
 }
 
 export function SecuritySettings() {
