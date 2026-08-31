@@ -270,6 +270,8 @@ func migrateDB() error {
 		&Redemption{},
 		&Ability{},
 		&Log{},
+		&ChatQuestion{},
+		&ChatTermStat{},
 		&Midjourney{},
 		&TopUp{},
 		&QuotaData{},
