@@ -23,7 +23,9 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
+	"github.com/QuantumNous/new-api/pkg/enginemon"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/livemon"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
@@ -354,6 +356,11 @@ func InitResources() error {
 	}
 
 	perfmetrics.Init()
+
+	livemon.Init(func(removed int) {
+		common.SysError(fmt.Sprintf("livemon: swept %d stale in-flight entries", removed))
+	})
+	enginemon.Init(func(msg string) { common.SysError(msg) })
 
 	// 启动系统监控
 	common.StartSystemMonitor()

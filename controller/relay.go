@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/pkg/livemon"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
@@ -156,6 +157,14 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	relayInfo.SetEstimatePromptTokens(tokens)
 
+	// Live status registry: one map insert here and one delete in the defer.
+	// The defer also runs while a panic unwinds, and a background sweep drops
+	// anything that outlives the relay timeout, so a missed removal can never
+	// leave a phantom running request on the panel.
+	relayInfo.LiveEntry = livemon.Register(requestId, relayInfo.OriginModelName, relayInfo.UsingGroup,
+		relayInfo.UserId, relayInfo.TokenId, tokens, relayInfo.IsStream)
+	defer livemon.Done(relayInfo.LiveEntry)
+
 	// 用户级/令牌级最大上下文限制：在预扣费前拦截超限的大输入请求。
 	// 估算口径与预扣费一致（含历史消息、system、图片）；依赖 token 统计开启。
 	if limit := relayInfo.GetMaxContextTokens(); limit > 0 && tokens > limit {
@@ -224,6 +233,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 		addUsedChannel(c, channel.Id)
+		relayInfo.LiveEntry.SetChannel(channel.Id)
 		if billingErr := service.PrepareTieredBillingForSelectedGroup(c, relayInfo); billingErr != nil {
 			newAPIError = billingErr
 			break

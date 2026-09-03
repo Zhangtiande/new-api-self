@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
+	"github.com/QuantumNous/new-api/pkg/livemon"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/relayconvert/convmeta"
@@ -93,6 +94,9 @@ type RelayInfo struct {
 	StartTime             time.Time
 	FirstResponseTime     time.Time
 	isFirstResponse       bool
+	// LiveEntry is this request's slot in the live status registry. Nil when
+	// the request is not tracked; every method on it tolerates nil.
+	LiveEntry *livemon.Entry
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -889,6 +893,9 @@ func (info *RelayInfo) SetFirstResponseTime() {
 	if info.isFirstResponse {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
+		// Runs once per request, never per token, so the live panel costs one
+		// atomic store on the streaming path.
+		info.LiveEntry.MarkFirstToken()
 	}
 }
 

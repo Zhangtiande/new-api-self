@@ -24,6 +24,12 @@ type ChannelSettings struct {
 	// HTTP2ConnectionShards spreads HTTP/2 traffic across N independent transports
 	// (1-8). Zero/unset means 1. Ignored when HTTPProtocol is "http1".
 	HTTP2ConnectionShards int `json:"http2_connection_shards,omitempty"`
+	// EngineMetricsEnabled turns on background scraping of the upstream
+	// inference engine's Prometheus endpoint for the live status panel.
+	EngineMetricsEnabled bool `json:"engine_metrics_enabled,omitempty"`
+	// EngineMetricsURL overrides where that endpoint lives. Empty means the
+	// channel base URL with /metrics appended, which is where sglang serves it.
+	EngineMetricsURL string `json:"engine_metrics_url,omitempty"`
 }
 
 const (

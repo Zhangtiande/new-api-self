@@ -125,6 +125,12 @@ const LazyContentInsight = lazy(() =>
   }))
 )
 
+const LazyLiveStatus = lazy(() =>
+  import('@/features/live-status/live-status-section').then((m) => ({
+    default: m.LiveStatusSection,
+  }))
+)
+
 function LogStatCardsFallback() {
   return (
     <div className='overflow-hidden rounded-lg border'>
@@ -207,6 +213,9 @@ const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
   insight: {
     titleKey: 'Content Insight',
   },
+  live: {
+    titleKey: 'Live Status',
+  },
 }
 
 export function Dashboard() {
@@ -268,7 +277,10 @@ export function Dashboard() {
       DASHBOARD_SECTION_IDS.filter(
         (section) =>
           section !== 'overview' &&
-          ((section !== 'users' && section !== 'report' && section !== 'insight') ||
+          ((section !== 'users' &&
+            section !== 'report' &&
+            section !== 'insight' &&
+            section !== 'live') ||
             isAdmin)
       ),
     [isAdmin]
@@ -442,6 +454,13 @@ export function Dashboard() {
             <FadeIn>
               <Suspense fallback={<ModelChartsFallback />}>
                 <LazyContentInsight />
+              </Suspense>
+            </FadeIn>
+          )}
+          {activeSection === 'live' && isAdmin && (
+            <FadeIn>
+              <Suspense fallback={<ModelChartsFallback />}>
+                <LazyLiveStatus />
               </Suspense>
             </FadeIn>
           )}

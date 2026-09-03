@@ -1,0 +1,52 @@
+# Structure mirrors a real sglang /metrics response (tensor parallel 4, hybrid
+# SWA cache, speculative decoding). Values are synthetic; the shape is not.
+# HELP sglang:max_total_num_tokens Maximum total number of tokens in the KV cache pool.
+# TYPE sglang:max_total_num_tokens gauge
+sglang:max_total_num_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 1.000000e+06
+sglang:max_total_num_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="1"} 1.000000e+06
+sglang:max_total_num_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="2"} 1.000000e+06
+sglang:max_total_num_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="3"} 1.000000e+06
+# HELP sglang:num_running_reqs The number of running requests.
+# TYPE sglang:num_running_reqs gauge
+sglang:num_running_reqs{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 1.0
+# TYPE sglang:num_queue_reqs gauge
+sglang:num_queue_reqs{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.0
+# TYPE sglang:token_usage gauge
+sglang:token_usage{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.0
+# TYPE sglang:full_token_usage gauge
+sglang:full_token_usage{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.62
+# TYPE sglang:swa_token_usage gauge
+sglang:swa_token_usage{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.81
+# TYPE sglang:mamba_usage gauge
+sglang:mamba_usage{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.0
+# TYPE sglang:cache_hit_rate gauge
+sglang:cache_hit_rate{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.45
+# TYPE sglang:gen_throughput gauge
+sglang:gen_throughput{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 500.0
+# TYPE sglang:num_used_tokens gauge
+sglang:num_used_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 20000.0
+# HELP sglang:time_to_first_token_seconds Histogram of time to first token.
+# TYPE sglang:time_to_first_token_seconds histogram
+sglang:time_to_first_token_seconds_sum{engine_type="unified",is_streaming="true",model_name="test-model"} 200.0
+sglang:time_to_first_token_seconds_count{engine_type="unified",is_streaming="true",model_name="test-model"} 100.0
+sglang:time_to_first_token_seconds_sum{engine_type="unified",is_streaming="false",model_name="test-model"} 40.0
+sglang:time_to_first_token_seconds_count{engine_type="unified",is_streaming="false",model_name="test-model"} 20.0
+sglang:time_to_first_token_seconds_bucket{engine_type="unified",is_streaming="true",model_name="test-model",le="0.5"} 60.0
+# TYPE sglang:inter_token_latency_seconds histogram
+sglang:inter_token_latency_seconds_sum{engine_type="unified",model_name="test-model"} 60.0
+sglang:inter_token_latency_seconds_count{engine_type="unified",model_name="test-model"} 30000.0
+# TYPE sglang:queue_time_seconds histogram
+sglang:queue_time_seconds_sum{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 50.0
+sglang:queue_time_seconds_count{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 1000.0
+sglang:queue_time_seconds_sum{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="1"} 50.0
+sglang:queue_time_seconds_count{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="1"} 1000.0
+sglang:queue_time_seconds_sum{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="2"} 50.0
+sglang:queue_time_seconds_count{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="2"} 1000.0
+sglang:queue_time_seconds_sum{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="3"} 50.0
+sglang:queue_time_seconds_count{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="3"} 1000.0
+# TYPE sglang:prompt_tokens_total counter
+sglang:prompt_tokens_total{engine_type="unified",is_streaming="true",model_name="test-model"} 1.000000e+06
+sglang:prompt_tokens_total{engine_type="unified",is_streaming="false",model_name="test-model"} 2.000000e+05
+# TYPE sglang:generation_tokens_total counter
+sglang:generation_tokens_total{engine_type="unified",is_streaming="true",model_name="test-model"} 5.000000e+05
+sglang:generation_tokens_total{engine_type="unified",is_streaming="false",model_name="test-model"} 1.000000e+05
