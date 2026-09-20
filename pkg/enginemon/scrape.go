@@ -50,8 +50,25 @@ type EngineStats struct {
 	QueuedReqs  float64 `json:"queued_reqs"`
 	// TokenUsage is KV cache utilisation, the primary saturation signal.
 	// Sustained values above ~0.9 mean the engine is about to start preempting.
-	TokenUsage    float64 `json:"token_usage"`
-	UsedTokens    float64 `json:"used_tokens"`
+	TokenUsage float64 `json:"token_usage"`
+	UsedTokens float64 `json:"used_tokens"`
+	// MaxTotalTokens is the KV pool capacity. Without it every other token
+	// count is a number without a denominator, and "is the working set still
+	// going to fit" cannot be answered.
+	MaxTotalTokens float64 `json:"max_total_tokens"`
+	// The pool splits three ways and only reading all three explains what the
+	// engine is doing. Active is held by running sequences. Cached is the
+	// reusable prefix tree, which fills the pool by design and is the reason a
+	// long-context workload is affordable at all. Free is what is left before
+	// the next allocation has to destroy someone's cached prefix.
+	KvActiveTokens float64 `json:"kv_active_tokens"`
+	KvCachedTokens float64 `json:"kv_cached_tokens"`
+	KvFreeTokens   float64 `json:"kv_free_tokens"`
+	// RetractedReqs counts sequences the scheduler pushed back out of the
+	// running batch for want of KV space. Any non-zero value is the engine
+	// stating outright that it is over capacity.
+	RetractedReqs float64 `json:"retracted_reqs"`
+	PausedReqs    float64 `json:"paused_reqs"`
 	CacheHitRate  float64 `json:"cache_hit_rate"`
 	GenThroughput float64 `json:"gen_throughput"`
 
@@ -66,6 +83,18 @@ type EngineStats struct {
 	QueueTimeMs      float64 `json:"queue_time_ms"`
 	PromptTokensRate float64 `json:"prompt_tokens_rate"`
 	OutputTokensRate float64 `json:"output_tokens_rate"`
+	// PrefillComputeRate is the share of PromptTokensRate the engine actually
+	// had to compute, the prefix cache having absorbed the rest. It is the only
+	// direct measure of prefill capacity a gateway can take from the outside.
+	PrefillComputeRate float64 `json:"prefill_compute_rate"`
+	// CacheHitTokenRate is token-weighted over the scrape interval, unlike the
+	// engine's own instantaneous cache_hit_rate gauge. A deployment whose
+	// economics rest on prefix reuse lives or dies by this number.
+	CacheHitTokenRate float64 `json:"cache_hit_token_rate"`
+	// EvictionRate is cached tokens destroyed per second. A full pool is
+	// healthy; a full pool with a high eviction rate is cache thrashing, and
+	// that is the state a prefix-dependent deployment collapses from.
+	EvictionRate float64 `json:"eviction_rate"`
 }
 
 type target struct {
@@ -206,6 +235,12 @@ func scrapeOnce(t target) {
 	st.stats.QueuedReqs = samples["num_queue_reqs"]
 	st.stats.TokenUsage = kvSaturation(samples)
 	st.stats.UsedTokens = samples["num_used_tokens"]
+	st.stats.MaxTotalTokens = samples["max_total_num_tokens"]
+	st.stats.KvActiveTokens = samples["kv_used_tokens"]
+	st.stats.KvCachedTokens = samples["kv_evictable_tokens"]
+	st.stats.KvFreeTokens = samples["kv_available_tokens"]
+	st.stats.RetractedReqs = samples["num_retracted_reqs"]
+	st.stats.PausedReqs = samples["num_paused_reqs"]
 	st.stats.CacheHitRate = samples["cache_hit_rate"]
 	st.stats.GenThroughput = samples["gen_throughput"]
 
@@ -221,6 +256,19 @@ func scrapeOnce(t target) {
 		if elapsed > 0 {
 			st.stats.PromptTokensRate = counterRate(st.prev, samples, "prompt_tokens_total", elapsed)
 			st.stats.OutputTokensRate = counterRate(st.prev, samples, "generation_tokens_total", elapsed)
+			cachedRate := counterRate(st.prev, samples, "cached_tokens_total", elapsed)
+			if cachedRate > st.stats.PromptTokensRate {
+				// Counters advance between reads; clamp so a skew can never
+				// report negative compute or a hit rate above one.
+				cachedRate = st.stats.PromptTokensRate
+			}
+			st.stats.EvictionRate = counterRate(st.prev, samples, "evicted_tokens_total", elapsed)
+			st.stats.PrefillComputeRate = st.stats.PromptTokensRate - cachedRate
+			if st.stats.PromptTokensRate > 0 {
+				st.stats.CacheHitTokenRate = cachedRate / st.stats.PromptTokensRate
+			} else {
+				st.stats.CacheHitTokenRate = 0
+			}
 		}
 	}
 	st.prev = samples
@@ -271,14 +319,17 @@ func kvSaturation(samples map[string]float64) float64 {
 	return worst
 }
 
-// ratioMetrics are averaged rather than summed when an engine exposes one
-// series per rank: adding utilisation ratios together is meaningless.
-var ratioMetrics = map[string]bool{
-	"token_usage":      true,
-	"full_token_usage": true,
-	"swa_token_usage":  true,
-	"mamba_usage":      true,
-	"cache_hit_rate":   true,
+// replicatedMetrics describe the whole engine, yet every rank publishes its own
+// copy of them. Summing those copies multiplies the value by the rank count, so
+// they collapse by maximum instead: a utilisation ratio and a pool capacity are
+// both properties of the engine, not quantities each rank contributes to.
+var replicatedMetrics = map[string]bool{
+	"token_usage":          true,
+	"full_token_usage":     true,
+	"swa_token_usage":      true,
+	"mamba_usage":          true,
+	"cache_hit_rate":       true,
+	"max_total_num_tokens": true,
 }
 
 // parse reads the Prometheus text exposition format and folds every series of a
@@ -309,7 +360,7 @@ func parse(body string) map[string]float64 {
 		}
 		name = strings.TrimPrefix(name, "sglang_")
 		name = strings.TrimPrefix(name, "sglang:")
-		if _, seen := out[name]; seen && ratioMetrics[name] {
+		if _, seen := out[name]; seen && replicatedMetrics[name] {
 			if value > out[name] {
 				out[name] = value
 			}

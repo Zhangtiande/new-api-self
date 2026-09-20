@@ -33,6 +33,8 @@ type Entry struct {
 	requestID    string
 	model        string
 	group        string
+	tokenName    string
+	username     string
 	userID       int
 	tokenID      int
 	isStream     bool
@@ -75,7 +77,7 @@ var registry = struct {
 // Register adds a request to the live registry. The caller must defer Done on
 // the returned entry. A nil entry is valid and every method tolerates it, so
 // the caller never needs a nil check.
-func Register(requestID, model, group string, userID, tokenID, promptTokens int, isStream bool) *Entry {
+func Register(requestID, model, group, tokenName, username string, userID, tokenID, promptTokens int, isStream bool) *Entry {
 	registry.mu.Lock()
 	if len(registry.m) >= MaxTrackedRequests {
 		registry.mu.Unlock()
@@ -86,6 +88,8 @@ func Register(requestID, model, group string, userID, tokenID, promptTokens int,
 		requestID:    requestID,
 		model:        model,
 		group:        group,
+		tokenName:    tokenName,
+		username:     username,
 		userID:       userID,
 		tokenID:      tokenID,
 		isStream:     isStream,
@@ -130,6 +134,8 @@ type RequestLive struct {
 	Model        string `json:"model"`
 	Group        string `json:"group"`
 	ChannelID    int    `json:"channel_id"`
+	TokenName    string `json:"token_name"`
+	Username     string `json:"username"`
 	UserID       int    `json:"user_id"`
 	TokenID      int    `json:"token_id"`
 	AgeMs        int64  `json:"age_ms"`
@@ -156,17 +162,37 @@ type ModelLive struct {
 
 // ChannelLive aggregates in-flight requests for one upstream channel.
 type ChannelLive struct {
-	ChannelID  int `json:"channel_id"`
-	InFlight   int `json:"in_flight"`
-	Prefilling int `json:"prefilling"`
+	ChannelID    int `json:"channel_id"`
+	InFlight     int `json:"in_flight"`
+	Prefilling   int `json:"prefilling"`
+	PromptTokens int `json:"prompt_tokens"`
+}
+
+// TokenLive aggregates in-flight requests for one API key. PromptTokens is the
+// live context the key is holding open, which is what actually occupies the
+// engine's KV pool: a key with two 200k-token conversations costs far more than
+// one with fifty short ones, and only this number says so.
+type TokenLive struct {
+	TokenID      int    `json:"token_id"`
+	TokenName    string `json:"token_name"`
+	Username     string `json:"username"`
+	InFlight     int    `json:"in_flight"`
+	Prefilling   int    `json:"prefilling"`
+	PromptTokens int    `json:"prompt_tokens"`
+	MaxAgeMs     int64  `json:"max_age_ms"`
 }
 
 // Snapshot is a consistent view of the registry at one instant.
 type Snapshot struct {
-	Ts            int64         `json:"ts"`
-	TotalInFlight int           `json:"total_in_flight"`
-	Models        []ModelLive   `json:"models"`
-	Channels      []ChannelLive `json:"channels"`
+	Ts            int64 `json:"ts"`
+	TotalInFlight int   `json:"total_in_flight"`
+	// PromptTokens is the sum of every in-flight request's context. Compared
+	// against the engine's KV pool size it answers the only question that
+	// predicts a prefix-cache collapse: does the live working set still fit?
+	PromptTokens int           `json:"prompt_tokens"`
+	Models       []ModelLive   `json:"models"`
+	Channels     []ChannelLive `json:"channels"`
+	Tokens       []TokenLive   `json:"tokens"`
 	// Requests holds the longest-running requests, the entry point for
 	// "who is holding the GPU right now".
 	Requests  []RequestLive `json:"requests"`
@@ -192,6 +218,8 @@ func Take(now time.Time) Snapshot {
 			RequestID:    e.requestID,
 			Model:        e.model,
 			Group:        e.group,
+			TokenName:    e.tokenName,
+			Username:     e.username,
 			ChannelID:    int(e.channelID.Load()),
 			UserID:       e.userID,
 			TokenID:      e.tokenID,
@@ -208,6 +236,7 @@ func Take(now time.Time) Snapshot {
 	ttftSum := map[string]int64{}
 	ttftCount := map[string]int64{}
 	byChannel := map[int]*ChannelLive{}
+	byToken := map[int]*TokenLive{}
 	for _, r := range rows {
 		m, ok := byModel[r.Model]
 		if !ok {
@@ -233,8 +262,23 @@ func Take(now time.Time) Snapshot {
 			byChannel[r.ChannelID] = ch
 		}
 		ch.InFlight++
+		ch.PromptTokens += r.PromptTokens
 		if r.TtftMs < 0 {
 			ch.Prefilling++
+		}
+
+		tk, ok := byToken[r.TokenID]
+		if !ok {
+			tk = &TokenLive{TokenID: r.TokenID, TokenName: r.TokenName, Username: r.Username}
+			byToken[r.TokenID] = tk
+		}
+		tk.InFlight++
+		tk.PromptTokens += r.PromptTokens
+		if r.AgeMs > tk.MaxAgeMs {
+			tk.MaxAgeMs = r.AgeMs
+		}
+		if r.TtftMs < 0 {
+			tk.Prefilling++
 		}
 	}
 
@@ -243,6 +287,7 @@ func Take(now time.Time) Snapshot {
 		TotalInFlight: len(rows),
 		Models:        make([]ModelLive, 0, len(byModel)),
 		Channels:      make([]ChannelLive, 0, len(byChannel)),
+		Tokens:        make([]TokenLive, 0, len(byToken)),
 	}
 	for name, m := range byModel {
 		if n := ttftCount[name]; n > 0 {
@@ -253,8 +298,16 @@ func Take(now time.Time) Snapshot {
 	for _, ch := range byChannel {
 		snap.Channels = append(snap.Channels, *ch)
 	}
+	for _, tk := range byToken {
+		snap.PromptTokens += tk.PromptTokens
+		snap.Tokens = append(snap.Tokens, *tk)
+	}
 	sort.Slice(snap.Models, func(i, j int) bool { return snap.Models[i].InFlight > snap.Models[j].InFlight })
 	sort.Slice(snap.Channels, func(i, j int) bool { return snap.Channels[i].InFlight > snap.Channels[j].InFlight })
+	// Ranked by held context, not by request count: the panel exists to answer
+	// "who is occupying the GPU", and a single long conversation outweighs a
+	// burst of short ones by two orders of magnitude.
+	sort.Slice(snap.Tokens, func(i, j int) bool { return snap.Tokens[i].PromptTokens > snap.Tokens[j].PromptTokens })
 
 	sort.Slice(rows, func(i, j int) bool { return rows[i].AgeMs > rows[j].AgeMs })
 	if len(rows) > TopRequests {

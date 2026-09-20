@@ -20,6 +20,10 @@ type channelLiveView struct {
 
 	GatewayInFlight   int `json:"gateway_in_flight"`
 	GatewayPrefilling int `json:"gateway_prefilling"`
+	// GatewayPromptTokens is the context the gateway is holding open against
+	// this channel. Read against the engine's KV pool it shows how much of the
+	// pool the live conversations alone will claim.
+	GatewayPromptTokens int `json:"gateway_prompt_tokens"`
 
 	Engine *enginemon.EngineStats `json:"engine,omitempty"`
 	// Gap is gateway in-flight minus what the engine admits to holding. A
@@ -39,9 +43,10 @@ func GetLiveStatus(c *gin.Context) {
 	byChannel := make(map[int]*channelLiveView, len(gateway.Channels)+len(engines))
 	for _, ch := range gateway.Channels {
 		byChannel[ch.ChannelID] = &channelLiveView{
-			ChannelID:         ch.ChannelID,
-			GatewayInFlight:   ch.InFlight,
-			GatewayPrefilling: ch.Prefilling,
+			ChannelID:           ch.ChannelID,
+			GatewayInFlight:     ch.InFlight,
+			GatewayPrefilling:   ch.Prefilling,
+			GatewayPromptTokens: ch.PromptTokens,
 		}
 	}
 	for i := range engines {
@@ -69,8 +74,10 @@ func GetLiveStatus(c *gin.Context) {
 		"data": gin.H{
 			"ts":              gateway.Ts,
 			"total_in_flight": gateway.TotalInFlight,
+			"prompt_tokens":   gateway.PromptTokens,
 			"models":          gateway.Models,
 			"channels":        channels,
+			"tokens":          gateway.Tokens,
 			"requests":        gateway.Requests,
 			"truncated":       gateway.Truncated,
 		},

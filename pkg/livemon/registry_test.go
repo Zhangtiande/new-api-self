@@ -19,7 +19,7 @@ func resetRegistry(t *testing.T) {
 func TestRegisterAndDoneLifecycle(t *testing.T) {
 	resetRegistry(t)
 
-	e := Register("req-1", "qwen3-32b", "default", 7, 3, 1200, true)
+	e := Register("req-1", "qwen3-32b", "default", "tk-a", "alice", 7, 3, 1200, true)
 	require.NotNil(t, e)
 
 	snap := Take(time.Now())
@@ -36,7 +36,7 @@ func TestRegisterAndDoneLifecycle(t *testing.T) {
 
 func TestMarkFirstTokenMovesRequestToGenerating(t *testing.T) {
 	resetRegistry(t)
-	e := Register("req-1", "qwen3-32b", "default", 7, 3, 10, true)
+	e := Register("req-1", "qwen3-32b", "default", "tk-a", "alice", 7, 3, 10, true)
 	defer Done(e)
 
 	e.MarkFirstToken()
@@ -58,7 +58,7 @@ func TestMarkFirstTokenMovesRequestToGenerating(t *testing.T) {
 
 func TestSetChannelCountsRetriesNotFirstBind(t *testing.T) {
 	resetRegistry(t)
-	e := Register("req-1", "qwen3-32b", "default", 7, 3, 10, false)
+	e := Register("req-1", "qwen3-32b", "default", "tk-a", "alice", 7, 3, 10, false)
 	defer Done(e)
 
 	e.SetChannel(4)
@@ -80,9 +80,9 @@ func TestSetChannelCountsRetriesNotFirstBind(t *testing.T) {
 // forever. The age sweep is the backstop that makes that impossible.
 func TestSweepReclaimsLeakedEntries(t *testing.T) {
 	resetRegistry(t)
-	leaked := Register("leaked", "qwen3-32b", "default", 1, 1, 10, false)
+	leaked := Register("leaked", "qwen3-32b", "default", "tk-a", "alice", 1, 1, 10, false)
 	require.NotNil(t, leaked)
-	live := Register("live", "qwen3-32b", "default", 1, 1, 10, false)
+	live := Register("live", "qwen3-32b", "default", "tk-a", "alice", 1, 1, 10, false)
 	defer Done(live)
 
 	leaked.startNano = time.Now().Add(-2 * MaxEntryAge).UnixNano()
@@ -106,7 +106,7 @@ func TestRegisterRefusesPastCap(t *testing.T) {
 	}
 	registry.mu.Unlock()
 
-	assert.Nil(t, Register("overflow", "m", "g", 1, 1, 1, false),
+	assert.Nil(t, Register("overflow", "m", "g", "tk-a", "alice", 1, 1, 1, false),
 		"past the cap the request must still relay, it is only unobservable")
 	resetRegistry(t)
 }
@@ -145,7 +145,7 @@ func TestConcurrentRegisterDoneAndSnapshot(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 200; j++ {
-				e := Register("r", "qwen3-32b", "default", 1, 1, 5, true)
+				e := Register("r", "qwen3-32b", "default", "tk-a", "alice", 1, 1, 5, true)
 				e.SetChannel(4)
 				e.MarkFirstToken()
 				Done(e)
@@ -166,7 +166,7 @@ func BenchmarkRegisterDone(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			e := Register("req", "qwen3-32b", "default", 1, 1, 1000, true)
+			e := Register("req", "qwen3-32b", "default", "tk-a", "alice", 1, 1, 1000, true)
 			e.SetChannel(4)
 			e.MarkFirstToken()
 			Done(e)
@@ -179,7 +179,7 @@ func BenchmarkTakeWith500InFlight(b *testing.B) {
 	registry.m = map[uint64]*Entry{}
 	registry.mu.Unlock()
 	for i := 0; i < 500; i++ {
-		e := Register("req", "qwen3-32b", "default", 1, 1, 1000, true)
+		e := Register("req", "qwen3-32b", "default", "tk-a", "alice", 1, 1, 1000, true)
 		e.SetChannel(4)
 		if i%2 == 0 {
 			e.MarkFirstToken()
@@ -190,4 +190,31 @@ func BenchmarkTakeWith500InFlight(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		Take(time.Now())
 	}
+}
+
+// Attribution is the panel's whole reason to exist when every key belongs to
+// the same account: user_id alone cannot tell two teams apart.
+func TestTokenAggregationRanksByHeldContextNotRequestCount(t *testing.T) {
+	resetRegistry(t)
+
+	// One key with many cheap calls, one key with a single huge conversation.
+	for i := 0; i < 20; i++ {
+		defer Done(Register("chat", "gentis", "default", "web-ui", "alice", 1, 9, 500, true))
+	}
+	defer Done(Register("agent", "gentis-thinking", "default", "coding-agent", "alice", 1, 4, 240000, true))
+
+	snap := Take(time.Now())
+	require.Len(t, snap.Tokens, 2)
+
+	assert.Equal(t, "coding-agent", snap.Tokens[0].TokenName,
+		"the key holding the most context ranks first even with the fewest requests")
+	assert.Equal(t, 240000, snap.Tokens[0].PromptTokens)
+	assert.Equal(t, 1, snap.Tokens[0].InFlight)
+
+	assert.Equal(t, "web-ui", snap.Tokens[1].TokenName)
+	assert.Equal(t, 20, snap.Tokens[1].InFlight)
+	assert.Equal(t, 10000, snap.Tokens[1].PromptTokens)
+
+	assert.Equal(t, 250000, snap.PromptTokens, "total working set is the sum over every key")
+	assert.Equal(t, "alice", snap.Tokens[0].Username)
 }

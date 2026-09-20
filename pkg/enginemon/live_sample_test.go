@@ -30,7 +30,10 @@ func TestLiveSampleSchedulerGaugesAreNotMultipliedByTpRank(t *testing.T) {
 	assert.Equal(t, 1.0, got["num_running_reqs"])
 	assert.Equal(t, 0.0, got["num_queue_reqs"])
 	assert.Equal(t, 20000.0, got["num_used_tokens"], "single rank-0 series must pass through unscaled")
-	assert.Equal(t, 4e6, got["max_total_num_tokens"], "config gauges really are repeated on every rank")
+	// Pool capacity describes the engine, yet every rank republishes it. It
+	// must fold to the engine's real pool, because the panel divides live
+	// context by this number to say whether the working set still fits.
+	assert.Equal(t, 1e6, got["max_total_num_tokens"], "replicated config gauges collapse, never accumulate")
 }
 
 // The regression that matters most: on a hybrid SWA model the legacy
@@ -90,4 +93,27 @@ func TestLiveSampleQueueTimePoolsToPerRankMean(t *testing.T) {
 		"queue_time_seconds_count": got["queue_time_seconds_count"] - 4*1.0,
 	}
 	assert.InDelta(t, 500.0, histAvgMs(prev, got, "queue_time_seconds"), 1e-9)
+}
+
+// The gauge that names itself "token_usage" counts running sequences only. On a
+// long-context deployment the prefix tree fills the pool and that gauge still
+// reads zero, which is how a saturated engine can look idle. The three kv_*
+// gauges are the ones that describe the pool, and they must survive folding
+// unscaled so the panel can show where the pool actually went.
+func TestLiveSamplePoolBreakdownSurvivesTheIdleLookingUsageGauge(t *testing.T) {
+	got := liveSample(t)
+
+	require.Equal(t, 0.0, got["token_usage"], "the misleading gauge is the point of this fixture")
+
+	active := got["kv_used_tokens"]
+	cached := got["kv_evictable_tokens"]
+	free := got["kv_available_tokens"]
+	assert.Equal(t, 20000.0, active)
+	assert.Equal(t, 975000.0, cached)
+	assert.Equal(t, 5000.0, free)
+	assert.Equal(t, got["max_total_num_tokens"], active+cached+free,
+		"the three parts must account for the whole pool, or the panel's percentages lie")
+
+	assert.Equal(t, 2.0, got["num_retracted_reqs"], "preemption is a hard over-capacity signal, never drop it")
+	assert.Equal(t, 3.0e9, got["evicted_tokens_total"])
 }

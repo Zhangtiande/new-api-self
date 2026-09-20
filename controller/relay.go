@@ -162,6 +162,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	// anything that outlives the relay timeout, so a missed removal can never
 	// leave a phantom running request on the panel.
 	relayInfo.LiveEntry = livemon.Register(requestId, relayInfo.OriginModelName, relayInfo.UsingGroup,
+		c.GetString("token_name"), common.GetContextKeyString(c, constant.ContextKeyUserName),
 		relayInfo.UserId, relayInfo.TokenId, tokens, relayInfo.IsStream)
 	defer livemon.Done(relayInfo.LiveEntry)
 

@@ -25,6 +25,22 @@ sglang:cache_hit_rate{engine_type="unified",model_name="test-model",moe_ep_rank=
 sglang:gen_throughput{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 500.0
 # TYPE sglang:num_used_tokens gauge
 sglang:num_used_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 20000.0
+# The pool splits three ways and they sum to max_total_num_tokens. Note the
+# trap this fixture preserves: the cache has filled the pool almost completely
+# while token_usage still reads 0, because that gauge only counts running
+# sequences. Reading it alone reports an idle engine sitting on a full pool.
+# TYPE sglang:kv_used_tokens gauge
+sglang:kv_used_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 20000.0
+# TYPE sglang:kv_evictable_tokens gauge
+sglang:kv_evictable_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 975000.0
+# TYPE sglang:kv_available_tokens gauge
+sglang:kv_available_tokens{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 5000.0
+# TYPE sglang:num_retracted_reqs gauge
+sglang:num_retracted_reqs{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 2.0
+# TYPE sglang:num_paused_reqs gauge
+sglang:num_paused_reqs{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 0.0
+# TYPE sglang:evicted_tokens_total counter
+sglang:evicted_tokens_total{engine_type="unified",model_name="test-model",moe_ep_rank="0",pp_rank="0",tp_rank="0"} 3.0e+09
 # HELP sglang:time_to_first_token_seconds Histogram of time to first token.
 # TYPE sglang:time_to_first_token_seconds histogram
 sglang:time_to_first_token_seconds_sum{engine_type="unified",is_streaming="true",model_name="test-model"} 200.0

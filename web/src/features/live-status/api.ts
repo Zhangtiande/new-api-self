@@ -31,6 +31,12 @@ export type EngineStats = {
   queued_reqs: number
   token_usage: number
   used_tokens: number
+  max_total_tokens: number
+  kv_active_tokens: number
+  kv_cached_tokens: number
+  kv_free_tokens: number
+  retracted_reqs: number
+  paused_reqs: number
   cache_hit_rate: number
   gen_throughput: number
   ttft_ms: number
@@ -39,6 +45,9 @@ export type EngineStats = {
   queue_time_ms: number
   prompt_tokens_rate: number
   output_tokens_rate: number
+  prefill_compute_rate: number
+  cache_hit_token_rate: number
+  eviction_rate: number
 }
 
 export type ChannelLive = {
@@ -46,6 +55,7 @@ export type ChannelLive = {
   channel_name: string
   gateway_in_flight: number
   gateway_prefilling: number
+  gateway_prompt_tokens: number
   engine?: EngineStats
   gap: number
   has_engine: boolean
@@ -61,11 +71,23 @@ export type ModelLive = {
   avg_observed_ttft_ms: number
 }
 
+export type TokenLive = {
+  token_id: number
+  token_name: string
+  username: string
+  in_flight: number
+  prefilling: number
+  prompt_tokens: number
+  max_age_ms: number
+}
+
 export type RequestLive = {
   request_id: string
   model: string
   group: string
   channel_id: number
+  token_name: string
+  username: string
   user_id: number
   token_id: number
   age_ms: number
@@ -78,8 +100,10 @@ export type RequestLive = {
 export type LiveStatus = {
   ts: number
   total_in_flight: number
+  prompt_tokens: number
   models: ModelLive[]
   channels: ChannelLive[]
+  tokens: TokenLive[]
   requests: RequestLive[]
   truncated: boolean
 }

@@ -42,12 +42,25 @@ const POLL_INTERVAL_MS = 2000
 const TOKEN_USAGE_CRITICAL = 0.9
 const TOKEN_USAGE_WARN = 0.75
 
+// A long-context deployment only clears its prefill demand because the prefix
+// cache absorbs most of it. Below this the engine has to compute a share it was
+// never sized for, and latency compounds from there.
+const CACHE_HIT_CRITICAL = 0.8
+
 function formatDuration(ms: number) {
   if (ms < 1000) return `${Math.max(ms, 0)}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   const minutes = Math.floor(ms / 60000)
   const seconds = Math.floor((ms % 60000) / 1000)
   return `${minutes}m${seconds}s`
+}
+
+// Token counts on this panel run from a few hundred to several million, so the
+// raw integers stop being comparable at a glance exactly where it matters.
+function formatTokens(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return String(Math.round(n))
 }
 
 function usageTone(usage: number) {
@@ -83,10 +96,7 @@ function ChannelRow(props: { channel: ChannelLive }) {
         <TableCell className='tabular-nums'>
           {props.channel.gateway_in_flight}
         </TableCell>
-        <TableCell
-          colSpan={8}
-          className='text-muted-foreground text-xs'
-        >
+        <TableCell colSpan={11} className='text-muted-foreground text-xs'>
           {t('Engine metrics not configured for this channel')}
         </TableCell>
       </TableRow>
@@ -102,7 +112,7 @@ function ChannelRow(props: { channel: ChannelLive }) {
         <TableCell className='tabular-nums'>
           {props.channel.gateway_in_flight}
         </TableCell>
-        <TableCell colSpan={8}>
+        <TableCell colSpan={11}>
           <Badge variant='destructive'>{t('Scrape failed')}</Badge>
           <span className='text-muted-foreground ml-2 text-xs'>
             {engine?.error}
@@ -116,6 +126,11 @@ function ChannelRow(props: { channel: ChannelLive }) {
     <TableRow>
       <TableCell className='font-medium'>
         {engine.channel_name || `#${props.channel.channel_id}`}
+        {engine.retracted_reqs > 0 ? (
+          <Badge variant='destructive' className='ml-2'>
+            {t('Preempting')}
+          </Badge>
+        ) : null}
       </TableCell>
       <TableCell className='tabular-nums'>
         {props.channel.gateway_in_flight}
@@ -135,15 +150,55 @@ function ChannelRow(props: { channel: ChannelLive }) {
         {engine.queued_reqs}
       </TableCell>
       <TableCell
-        className={cn('font-medium tabular-nums', usageTone(engine.token_usage))}
+        className={cn(
+          'font-medium tabular-nums',
+          usageTone(engine.token_usage)
+        )}
       >
-        {(engine.token_usage * 100).toFixed(0)}%
+        {formatTokens(engine.kv_active_tokens || engine.used_tokens)}
+        {engine.max_total_tokens > 0 ? (
+          <span className='text-muted-foreground'>
+            {' / '}
+            {formatTokens(engine.max_total_tokens)}
+          </span>
+        ) : null}
       </TableCell>
       <TableCell className='tabular-nums'>
-        {(engine.cache_hit_rate * 100).toFixed(0)}%
+        {engine.max_total_tokens > 0
+          ? `${((engine.kv_cached_tokens / engine.max_total_tokens) * 100).toFixed(0)}%`
+          : '-'}
+      </TableCell>
+      <TableCell
+        className={cn(
+          'font-medium tabular-nums',
+          engine.prompt_tokens_rate > 0 &&
+            engine.cache_hit_token_rate < CACHE_HIT_CRITICAL &&
+            'text-red-600 dark:text-red-400'
+        )}
+      >
+        {engine.prompt_tokens_rate > 0
+          ? `${(engine.cache_hit_token_rate * 100).toFixed(1)}%`
+          : `${(engine.cache_hit_rate * 100).toFixed(0)}%`}
       </TableCell>
       <TableCell className='tabular-nums'>
-        {engine.gen_throughput.toFixed(0)}
+        {engine.prefill_compute_rate > 0
+          ? formatTokens(engine.prefill_compute_rate)
+          : '-'}
+      </TableCell>
+      <TableCell
+        className={cn(
+          'tabular-nums',
+          engine.eviction_rate > engine.prompt_tokens_rate &&
+            engine.eviction_rate > 0 &&
+            'text-red-600 dark:text-red-400'
+        )}
+      >
+        {engine.eviction_rate > 0 ? formatTokens(engine.eviction_rate) : '-'}
+      </TableCell>
+      <TableCell className='tabular-nums'>
+        {engine.output_tokens_rate > 0
+          ? engine.output_tokens_rate.toFixed(0)
+          : engine.gen_throughput.toFixed(0)}
       </TableCell>
       <TableCell className='tabular-nums'>
         {engine.ttft_ms > 0 ? `${engine.ttft_ms.toFixed(0)}ms` : '-'}
@@ -154,7 +209,9 @@ function ChannelRow(props: { channel: ChannelLive }) {
           engine.queue_time_ms > 1000 && 'text-amber-600 dark:text-amber-400'
         )}
       >
-        {engine.queue_time_ms > 0 ? `${engine.queue_time_ms.toFixed(0)}ms` : '-'}
+        {engine.queue_time_ms > 0
+          ? `${engine.queue_time_ms.toFixed(0)}ms`
+          : '-'}
       </TableCell>
       <TableCell
         className={cn(
@@ -182,9 +239,27 @@ export function LiveStatusSection() {
   const totalPrefilling =
     data?.models.reduce((sum, m) => sum + m.prefilling, 0) ?? 0
   const totalQueued =
-    data?.channels.reduce((sum, c) => sum + (c.engine?.queued_reqs ?? 0), 0) ?? 0
+    data?.channels.reduce((sum, c) => sum + (c.engine?.queued_reqs ?? 0), 0) ??
+    0
   const staleChannels =
     data?.channels.filter((c) => c.has_engine && !c.engine?.fresh).length ?? 0
+  const liveEngines = data?.channels.filter((c) => c.engine?.fresh) ?? []
+  const promptRate = liveEngines.reduce(
+    (sum, c) => sum + (c.engine?.prompt_tokens_rate ?? 0),
+    0
+  )
+  const computeRate = liveEngines.reduce(
+    (sum, c) => sum + (c.engine?.prefill_compute_rate ?? 0),
+    0
+  )
+  const cacheHit = promptRate > 0 ? 1 - computeRate / promptRate : 0
+  const totalContext = data?.prompt_tokens ?? 0
+  // The request list carries channel ids only; the channel list is the single
+  // place that knows their names, so resolve here rather than making an
+  // operator memorise which number is which upstream.
+  const channelNames = new Map(
+    data?.channels.map((c) => [c.channel_id, c.channel_name]) ?? []
+  )
 
   if (query.isError) {
     return (
@@ -196,7 +271,7 @@ export function LiveStatusSection() {
 
   return (
     <div className='space-y-6'>
-      <div className='grid grid-cols-2 gap-4 lg:grid-cols-4'>
+      <div className='grid grid-cols-2 gap-4 lg:grid-cols-3'>
         <SummaryCard
           label={t('In-flight requests')}
           value={String(data?.total_in_flight ?? 0)}
@@ -217,6 +292,16 @@ export function LiveStatusSection() {
           value={String(staleChannels)}
           hint={t('Metrics scrape failing')}
         />
+        <SummaryCard
+          label={t('Live context')}
+          value={formatTokens(data?.prompt_tokens ?? 0)}
+          hint={t('Context held open by in-flight requests')}
+        />
+        <SummaryCard
+          label={t('Prefix cache hit')}
+          value={promptRate > 0 ? `${(cacheHit * 100).toFixed(1)}%` : '-'}
+          hint={t('Share of prefill tokens the engine did not have to compute')}
+        />
       </div>
 
       <div>
@@ -229,9 +314,12 @@ export function LiveStatusSection() {
                 <TableHead>{t('Gateway')}</TableHead>
                 <TableHead>{t('Running')}</TableHead>
                 <TableHead>{t('Queued')}</TableHead>
-                <TableHead>{t('KV cache')}</TableHead>
+                <TableHead>{t('KV active')}</TableHead>
+                <TableHead>{t('Cache resident')}</TableHead>
                 <TableHead>{t('Prefix hit')}</TableHead>
-                <TableHead>{t('Tok/s')}</TableHead>
+                <TableHead>{t('Compute tok/s')}</TableHead>
+                <TableHead>{t('Evicted tok/s')}</TableHead>
+                <TableHead>{t('Output tok/s')}</TableHead>
                 <TableHead>{t('TTFT')}</TableHead>
                 <TableHead>{t('Queue wait')}</TableHead>
                 <TableHead>{t('Gap')}</TableHead>
@@ -245,7 +333,7 @@ export function LiveStatusSection() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={13}
                     className='text-muted-foreground text-center text-sm'
                   >
                     {t('No active channel')}
@@ -258,6 +346,11 @@ export function LiveStatusSection() {
         <p className='text-muted-foreground mt-2 text-xs'>
           {t(
             'Gap is gateway in-flight minus engine running plus queued. A persistently positive gap points at the network, the gateway or retries rather than at GPU saturation.'
+          )}
+        </p>
+        <p className='text-muted-foreground mt-1 text-xs'>
+          {t(
+            'KV active is what running sequences hold; cache resident is the reusable prefix tree, which fills the pool by design. A full pool is normal, a full pool with a high eviction rate is thrashing.'
           )}
         </p>
       </div>
@@ -281,7 +374,9 @@ export function LiveStatusSection() {
                 data.models.map((m) => (
                   <TableRow key={m.model}>
                     <TableCell className='font-medium'>{m.model}</TableCell>
-                    <TableCell className='tabular-nums'>{m.in_flight}</TableCell>
+                    <TableCell className='tabular-nums'>
+                      {m.in_flight}
+                    </TableCell>
                     <TableCell
                       className={cn(
                         'tabular-nums',
@@ -297,7 +392,7 @@ export function LiveStatusSection() {
                       {formatDuration(m.max_age_ms)}
                     </TableCell>
                     <TableCell className='tabular-nums'>
-                      {m.prompt_tokens}
+                      {formatTokens(m.prompt_tokens)}
                     </TableCell>
                   </TableRow>
                 ))
@@ -317,6 +412,76 @@ export function LiveStatusSection() {
       </div>
 
       <div>
+        <h3 className='mb-2 text-sm font-medium'>{t('Compute by key')}</h3>
+        <div className='overflow-x-auto rounded-lg border'>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('API key')}</TableHead>
+                <TableHead>{t('User')}</TableHead>
+                <TableHead>{t('Held context')}</TableHead>
+                <TableHead>{t('Share')}</TableHead>
+                <TableHead>{t('In-flight')}</TableHead>
+                <TableHead>{t('Prefilling')}</TableHead>
+                <TableHead>{t('Oldest')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.tokens.length ? (
+                data.tokens.map((tk) => (
+                  <TableRow key={tk.token_id}>
+                    <TableCell className='max-w-[16rem] truncate font-medium'>
+                      {tk.token_name || `#${tk.token_id}`}
+                    </TableCell>
+                    <TableCell className='max-w-[10rem] truncate'>
+                      {tk.username || '-'}
+                    </TableCell>
+                    <TableCell className='font-medium tabular-nums'>
+                      {formatTokens(tk.prompt_tokens)}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground tabular-nums'>
+                      {totalContext > 0
+                        ? `${((tk.prompt_tokens / totalContext) * 100).toFixed(0)}%`
+                        : '-'}
+                    </TableCell>
+                    <TableCell className='tabular-nums'>
+                      {tk.in_flight}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'tabular-nums',
+                        tk.prefilling > 0 &&
+                          'text-amber-600 dark:text-amber-400'
+                      )}
+                    >
+                      {tk.prefilling}
+                    </TableCell>
+                    <TableCell className='tabular-nums'>
+                      {formatDuration(tk.max_age_ms)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className='text-muted-foreground text-center text-sm'
+                  >
+                    {t('Nothing running')}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <p className='text-muted-foreground mt-2 text-xs'>
+          {t(
+            'Ranked by context held open, not by request count. One long conversation occupies more of the KV cache than dozens of short calls, so this ordering is what maps to GPU cost.'
+          )}
+        </p>
+      </div>
+
+      <div>
         <h3 className='mb-2 text-sm font-medium'>
           {t('Longest running requests')}
         </h3>
@@ -327,6 +492,7 @@ export function LiveStatusSection() {
                 <TableHead>{t('Elapsed')}</TableHead>
                 <TableHead>{t('Model')}</TableHead>
                 <TableHead>{t('Channel')}</TableHead>
+                <TableHead>{t('API key')}</TableHead>
                 <TableHead>{t('User')}</TableHead>
                 <TableHead>{t('Input tokens')}</TableHead>
                 <TableHead>{t('TTFT')}</TableHead>
@@ -341,12 +507,17 @@ export function LiveStatusSection() {
                       {formatDuration(r.age_ms)}
                     </TableCell>
                     <TableCell>{r.model}</TableCell>
-                    <TableCell className='tabular-nums'>
-                      #{r.channel_id}
+                    <TableCell className='max-w-[12rem] truncate'>
+                      {channelNames.get(r.channel_id) || `#${r.channel_id}`}
                     </TableCell>
-                    <TableCell className='tabular-nums'>{r.user_id}</TableCell>
+                    <TableCell className='max-w-[14rem] truncate'>
+                      {r.token_name || `#${r.token_id}`}
+                    </TableCell>
+                    <TableCell className='max-w-[10rem] truncate'>
+                      {r.username || r.user_id}
+                    </TableCell>
                     <TableCell className='tabular-nums'>
-                      {r.prompt_tokens}
+                      {formatTokens(r.prompt_tokens)}
                     </TableCell>
                     <TableCell className='tabular-nums'>
                       {r.ttft_ms >= 0 ? (
@@ -361,7 +532,7 @@ export function LiveStatusSection() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className='text-muted-foreground text-center text-sm'
                   >
                     {t('Nothing running')}
