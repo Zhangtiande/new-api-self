@@ -125,6 +125,10 @@ const LazyContentInsight = lazy(() =>
   }))
 )
 
+const LazyShowcase = lazy(() =>
+  import('@/features/showcase').then((m) => ({ default: m.ShowcaseDashboard }))
+)
+
 const LazyLiveStatus = lazy(() =>
   import('@/features/live-status/live-status-section').then((m) => ({
     default: m.LiveStatusSection,
@@ -195,6 +199,7 @@ function PerformanceOverviewFallback() {
 }
 
 const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
+  showcase: { titleKey: 'Business Showcase' },
   overview: {
     titleKey: 'Overview',
   },
@@ -280,7 +285,8 @@ export function Dashboard() {
           ((section !== 'users' &&
             section !== 'report' &&
             section !== 'insight' &&
-            section !== 'live') ||
+            section !== 'live' &&
+            section !== 'showcase') ||
             isAdmin)
       ),
     [isAdmin]
@@ -349,6 +355,14 @@ export function Dashboard() {
       </>
     ) : null
   const sectionActions = modelActions ?? flowActions
+
+  if (activeSection === 'showcase' && isAdmin) {
+    return (
+      <Suspense fallback={<ModelChartsFallback />}>
+        <LazyShowcase />
+      </Suspense>
+    )
+  }
 
   return (
     <SectionPageLayout>

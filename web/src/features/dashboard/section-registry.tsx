@@ -25,6 +25,12 @@ import { createSectionRegistry } from '@/features/system-settings/utils/section-
  */
 const DASHBOARD_SECTIONS = [
   {
+    id: 'showcase',
+    titleKey: 'Business Showcase',
+    adminOnly: true,
+    build: () => null,
+  },
+  {
     id: 'overview',
     titleKey: 'Overview',
     build: () => null,
@@ -72,6 +78,7 @@ const ADMIN_ONLY_SECTIONS = new Set<string>([
   'report',
   'insight',
   'live',
+  'showcase',
 ])
 
 const dashboardRegistry = createSectionRegistry<

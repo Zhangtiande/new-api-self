@@ -16,7 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useLocation,
+} from '@tanstack/react-router'
 
 import { AuthenticatedLayout } from '@/components/layout'
 import { useAuthStore } from '@/stores/auth-store'
@@ -32,5 +37,11 @@ export const Route = createFileRoute('/_authenticated')({
       })
     }
   },
-  component: AuthenticatedLayout,
+  component: AuthenticatedRouteLayout,
 })
+
+function AuthenticatedRouteLayout() {
+  const pathname = useLocation({ select: (location) => location.pathname })
+  if (pathname === '/dashboard/showcase') return <Outlet />
+  return <AuthenticatedLayout />
+}
